@@ -27,7 +27,8 @@ try {
     }
 
     if ($ssl_ca) {
-        $options[PDO::MYSQL_ATTR_SSL_CA] = $ssl_ca;
+        $ssl_key = defined('PDO::MYSQL_ATTR_SSL_CA') ? PDO::MYSQL_ATTR_SSL_CA : 1009;
+        $options[$ssl_key] = $ssl_ca;
     }
 
     // Connect directly to the database
