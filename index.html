@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>reinF Study Time Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+<!-- Load Chart.js for advanced visual charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="ambient">
+  <div class="orb"></div>
+  <div class="orb"></div>
+  <div class="orb"></div>
+</div>
+<div class="noise"></div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Clear all modal -->
+<div class="modal-overlay" id="clearModal">
+  <div class="modal">
+    <h3>Clear All Sessions</h3>
+    <p>This will permanently remove all your logged study sessions from the database and local storage. This action cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeClearModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmClearAll()">
+        <i class="fa-solid fa-trash"></i> Clear All
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Focus rating modal -->
+<div class="modal-overlay" id="focusModal">
+  <div class="modal">
+    <h3>Rate Your Concentration</h3>
+    <p>How was your concentration during this study session?</p>
+    <div class="focus-rating-options">
+      <button class="focus-option" id="focus-opt-1" onclick="selectFocusLevel(1)">
+        <span class="focus-stars">⭐</span>
+        <span class="focus-label">Low Focus</span>
+      </button>
+      <button class="focus-option" id="focus-opt-2" onclick="selectFocusLevel(2)">
+        <span class="focus-stars">⭐⭐</span>
+        <span class="focus-label">Medium Focus</span>
+      </button>
+      <button class="focus-option" id="focus-opt-3" onclick="selectFocusLevel(3)">
+        <span class="focus-stars">⭐⭐⭐</span>
+        <span class="focus-label">Excellent Focus</span>
+      </button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="saveSessionWithFocus(null)">Skip</button>
+      <button class="btn btn-primary" id="btnSaveFocus" onclick="saveSessionWithFocusSelected()" disabled>Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="app-wrapper">
+  <!-- Header -->
+  <header>
+    <div class="logo-group">
+      <div class="logo-icon">
+        <i class="fa-solid fa-bolt"></i>
+      </div>
+      <div class="logo-text">
+        <h1><span>reinF</span> Study Time Tracker</h1>
+        <p>Track. Focus. Improve.</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <!-- Mode Switch Toggle -->
+      <div class="mode-switch-container">
+        <button class="mode-btn active" id="mode-study-btn" onclick="toggleMode('study')">
+          <i class="fa-solid fa-graduation-cap"></i> Real Study
+        </button>
+        <button class="mode-btn" id="mode-assignment-btn" onclick="toggleMode('assignment')">
+          <i class="fa-solid fa-laptop-code"></i> Assignment
+        </button>
+      </div>
+      <!-- Database Connection Status Badge -->
+      <span class="db-status-badge offline" id="dbStatusBadge">
+        <i class="fa-solid fa-circle"></i> <span id="dbStatusText">Checking DB...</span>
+      </span>
+      <!-- User Profile Badge -->
+      <div class="user-badge" id="userBadge" style="display: none;">
+        <i class="fa-solid fa-user-circle"></i>
+        <span id="userBadgeName">Loading...</span>
+        <span class="user-role-tag" id="userBadgeRole">User</span>
+        <button class="btn-logout" onclick="logout()" title="Logout" aria-label="Logout">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
+      </div>
+      <button class="btn-icon" onclick="exportData()" title="Export data" aria-label="Export data">
+        <i class="fa-solid fa-download"></i>
+      </button>
+      <button class="btn-icon" onclick="openClearModal()" title="Clear all sessions" aria-label="Clear all sessions">
+        <i class="fa-solid fa-trash-can"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-tab="timer"><i class="fa-solid fa-stopwatch"></i> Focus Timer</button>
+    <button class="nav-tab" data-tab="dashboard"><i class="fa-solid fa-chart-line"></i> Dashboard</button>
+    <button class="nav-tab" data-tab="analytics"><i class="fa-solid fa-chart-pie"></i> Analytics</button>
+    <button class="nav-tab" data-tab="calendar"><i class="fa-solid fa-calendar-days"></i> Calendar</button>
+    <button class="nav-tab" data-tab="history"><i class="fa-solid fa-history"></i> History</button>
+    <button class="nav-tab" data-tab="admin" id="nav-tab-admin" style="display: none;"><i class="fa-solid fa-users-gear"></i> Admin Panel</button>
+  </nav>
+
+  <!-- Inspect Mode Banner -->
+  <div class="inspect-banner" id="inspectBanner" style="display: none; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
+      <span><i class="fa-solid fa-eye"></i> Inspecting dashboard for: <strong id="inspectUserName">username</strong></span>
+      <!-- Live Status Sub-badge -->
+      <span class="inspect-live-status-badge" id="inspectLiveStatus">
+        <span class="live-pulse-dot" id="inspectLivePulse"></span>
+        <span id="inspectLiveStatusText">Checking live status...</span>
+      </span>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="stopInspecting()" style="padding: 4px 8px; font-size: 12px;">
+      <i class="fa-solid fa-arrow-left"></i> Exit Inspect
+    </button>
+  </div>
+
+  <!-- PAGE 1: Focus Timer -->
+  <section class="page-section active" id="sec-timer">
+    <!-- Quick Stats Summary Row -->
+    <div class="stats-row" aria-label="Study statistics">
+      <div class="stat-card" style="--stat-color: var(--accent);">
+        <div class="stat-label">Today</div>
+        <div class="stat-value" id="statToday">0:00</div>
+        <div class="stat-sub" id="statTodaySessions">0 sessions</div>
+      </div>
+      <div class="stat-card" style="--stat-color: var(--success);">
+        <div class="stat-label">This Week</div>
+        <div class="stat-value" id="statWeek">0:00</div>
+        <div class="stat-sub" id="statWeekSessions">0 sessions</div>
+      </div>
+      <div class="stat-card" style="--stat-color: var(--info);">
+        <div class="stat-label">Streak</div>
+        <div class="stat-value" id="statStreak">0</div>
+        <div class="stat-sub">consecutive days</div>
+      </div>
+      <div class="stat-card" style="--stat-color: #c084fc;">
+        <div class="stat-label">All Time</div>
+        <div class="stat-value" id="statAllTime">0:00</div>
+        <div class="stat-sub" id="statAllTimeSessions">0 sessions</div>
+      </div>
+    </div>
+
+    <!-- Active Timer Card -->
+    <div class="timer-section" id="timerSection" aria-label="Study timer">
+      <input
+        type="text"
+        class="timer-subject-input"
+        id="subjectInput"
+        placeholder="What are you studying?"
+        maxlength="60"
+        aria-label="Study subject"
+      >
+      <div class="timer-display" id="timerDisplay">00:00:00</div>
+      <div class="timer-status" id="timerStatus">Ready to focus</div>
+      <div class="timer-controls">
+        <button class="btn btn-primary" id="btnStart" onclick="startTimer()">
+          <i class="fa-solid fa-play"></i> Start
+        </button>
+        <button class="btn btn-secondary" id="btnPause" onclick="pauseTimer()" disabled>
+          <i class="fa-solid fa-pause"></i> Pause
+        </button>
+        <button class="btn btn-danger" id="btnStop" onclick="stopTimer()" disabled>
+          <i class="fa-solid fa-stop"></i> Stop
+        </button>
+      </div>
+      <div class="subject-tags" id="subjectTags"></div>
+    </div>
+  </section>
+
+  <!-- PAGE 2: Dashboard -->
+  <section class="page-section" id="sec-dashboard">
+    <div class="dashboard-grid">
+      <div class="dashboard-card" style="--card-color: var(--accent);">
+        <div class="dashboard-title">Today's Study</div>
+        <div class="dashboard-value" id="dashTodayTime">0h 00m</div>
+        <div class="dashboard-sub"><i class="fa-solid fa-circle-dot"></i> Total studied today</div>
+      </div>
+      <div class="dashboard-card" style="--card-color: var(--info);">
+        <div class="dashboard-title">Sessions</div>
+        <div class="dashboard-value" id="dashTodaySessions">0</div>
+        <div class="dashboard-sub"><i class="fa-solid fa-layer-group"></i> Total sessions today</div>
+      </div>
+      <div class="dashboard-card" style="--card-color: var(--success);">
+        <div class="dashboard-title">Average Focus</div>
+        <div class="dashboard-value" id="dashAvgFocus">0.0</div>
+        <div class="dashboard-sub" id="dashAvgFocusStars">⭐⭐⭐</div>
+      </div>
+      <div class="dashboard-card" style="--card-color: #f472b6;">
+        <div class="dashboard-title">Current Streak</div>
+        <div class="dashboard-value" id="dashStreak">0 Days</div>
+        <div class="dashboard-sub"><i class="fa-solid fa-fire"></i> Study streak status</div>
+      </div>
+      <div class="dashboard-card" style="--card-color: #c084fc;">
+        <div class="dashboard-title">Weekly Total</div>
+        <div class="dashboard-value" id="dashWeekTotal">0 Hours</div>
+        <div class="dashboard-sub">Current week study time</div>
+      </div>
+      <div class="dashboard-card" style="--card-color: #5ab8e8;">
+        <div class="dashboard-title">Monthly Total</div>
+        <div class="dashboard-value" id="dashMonthTotal">0 Hours</div>
+        <div class="dashboard-sub">Current month study time</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAGE 3: Analytics Charts -->
+  <section class="page-section" id="sec-analytics">
+    <div class="chart-controls">
+      <button class="chart-btn active" id="chart-btn-daily" onclick="setChartMode('daily')">Daily</button>
+      <button class="chart-btn" id="chart-btn-weekly" onclick="setChartMode('weekly')">Weekly</button>
+      <button class="chart-btn" id="chart-btn-monthly" onclick="setChartMode('monthly')">Monthly</button>
+    </div>
+    <div class="analytics-container">
+      <div class="chart-card">
+        <h3><i class="fa-solid fa-chart-line" style="color: var(--accent);"></i> Study Time Chart</h3>
+        <div class="chart-wrapper">
+          <canvas id="studyTimeChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3><i class="fa-solid fa-brain" style="color: var(--info);"></i> Concentration Chart</h3>
+        <div class="chart-wrapper">
+          <canvas id="concentrationChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAGE 4: Calendar View -->
+  <section class="page-section" id="sec-calendar">
+    <div class="calendar-wrapper">
+      <div class="calendar-header">
+        <h3 id="calendarMonthYear">Month Year</h3>
+        <div class="calendar-nav">
+          <button class="calendar-nav-btn" onclick="changeMonth(-1)" aria-label="Previous month">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <button class="calendar-nav-btn" onclick="changeMonth(1)" aria-label="Next month">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+      <div class="calendar-grid-header">
+        <div>Sun</div>
+        <div>Mon</div>
+        <div>Tue</div>
+        <div>Wed</div>
+        <div>Thu</div>
+        <div>Fri</div>
+        <div>Sat</div>
+      </div>
+      <div class="calendar-grid" id="calendarGrid"></div>
+    </div>
+
+    <!-- Day detailed inspection timeline -->
+    <div class="day-details-panel" id="dayDetailsPanel" style="display: none;">
+      <div class="day-details-header">
+        <span id="selectedDateText">Date Name</span>
+        <span class="badge" id="selectedDateTotal">✓ 0m studied</span>
+      </div>
+      <div class="day-sessions-timeline" id="selectedDateSessions">
+        <!-- Sessions timeline dynamic load -->
+      </div>
+    </div>
+  </section>
+
+  <!-- PAGE 5: History -->
+  <section class="page-section" id="sec-history">
+    <div class="bottom-grid">
+      <div class="panel" aria-label="Session log">
+        <div class="panel-header">
+          <h2>Session Log</h2>
+          <span class="badge" id="sessionCount">0</span>
+        </div>
+        <div class="panel-body" id="sessionList">
+          <div class="empty-state">
+            <i class="fa-solid fa-book-open"></i>
+            <p>No study sessions yet.<br>Start your first session above.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" aria-label="Subject breakdown">
+        <div class="panel-header">
+          <h2>By Subject</h2>
+        </div>
+        <div class="panel-body" id="breakdownList">
+          <div class="empty-state">
+            <i class="fa-solid fa-chart-pie"></i>
+            <p>Study data will appear<br>here after your first session.</p>
+          </div>
+        </div>
+        <!-- Keep the original mini weekly-chart for backward design compatibility -->
+        <div class="weekly-chart" id="weeklyChart"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAGE 6: Admin Panel -->
+  <section class="page-section" id="sec-admin">
+    <div class="admin-grid">
+      <!-- Admin Header / Quick Action -->
+      <div class="panel" style="grid-column: 1 / -1;">
+        <div class="panel-header">
+          <h2>Admin Controls</h2>
+        </div>
+        <div class="panel-body">
+          <div class="admin-quick-actions">
+            <button class="btn btn-primary" onclick="openAddUserModal()">
+              <i class="fa-solid fa-user-plus"></i> Add New User
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Users List Panel -->
+      <div class="panel" style="grid-column: 1 / -1;">
+        <div class="panel-header">
+          <h2>Manage Users</h2>
+          <span class="badge" id="adminUserCount">0</span>
+        </div>
+        <div class="panel-body">
+          <div class="admin-table-container">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Status</th>
+                  <th>Role</th>
+                  <th>Total Sessions</th>
+                  <th>Total Study Time</th>
+                  <th>Created At</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminUserList">
+                <!-- Loaded dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Auth Overlay (Login/Register Card) -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <div class="auth-header">
+      <div class="auth-logo-icon">
+        <i class="fa-solid fa-bolt"></i>
+      </div>
+      <h2><span>reinF</span> Focus Tracker</h2>
+      <p>Sign in to track your study sessions</p>
+    </div>
+    
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="auth-tab-login" onclick="toggleAuthTab('login')">Login</button>
+      <button class="auth-tab" id="auth-tab-register" onclick="toggleAuthTab('register')">Register</button>
+    </div>
+
+    <form class="auth-form" id="authForm" onsubmit="handleAuthSubmit(event)">
+      <div class="input-group">
+        <label for="authUsername"><i class="fa-solid fa-user"></i> Username</label>
+        <input type="text" id="authUsername" placeholder="Enter username" required autocomplete="username">
+      </div>
+      
+      <div class="input-group">
+        <label for="authPassword"><i class="fa-solid fa-lock"></i> Password</label>
+        <input type="password" id="authPassword" placeholder="Enter password" required autocomplete="current-password">
+      </div>
+
+      <div class="auth-error-msg" id="authErrorMsg"></div>
+      
+      <button class="btn btn-primary btn-block" type="submit" id="btnAuthSubmit">
+        Login <i class="fa-solid fa-right-to-bracket"></i>
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <p class="credential-hint"><strong>Default Accounts:</strong><br>Admin: <code>admin</code> / <code>admin</code><br>User: <code>user</code> / <code>user</code></p>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Add User Modal -->
+<div class="modal-overlay" id="addUserModal">
+  <div class="modal">
+    <h3>Create New User</h3>
+    <form onsubmit="handleAdminCreateUser(event)" style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
+      <div class="input-group" style="text-align: left;">
+        <label for="newUsername">Username</label>
+        <input type="text" id="newUsername" placeholder="At least 3 characters" required style="width: 100%;" autocomplete="off">
+      </div>
+      <div class="input-group" style="text-align: left;">
+        <label for="newPassword">Password</label>
+        <input type="password" id="newPassword" placeholder="At least 4 characters" required style="width: 100%;" autocomplete="off">
+      </div>
+      <div class="input-group" style="text-align: left;">
+        <label for="newRole">Role</label>
+        <select id="newRole" style="width: 100%; background: var(--bg-elevated); color: var(--fg); border: 1px solid var(--border); padding: 10px; border-radius: 8px;" required>
+          <option value="user">User (Standard)</option>
+          <option value="admin">Admin (Full Access)</option>
+        </select>
+      </div>
+      <div id="addUserError" style="color: var(--danger); font-size: 13px; text-align: left;"></div>
+      <div class="modal-actions" style="margin-top: 10px;">
+        <button class="btn btn-secondary" type="button" onclick="closeAddUserModal()">Cancel</button>
+        <button class="btn btn-primary" type="submit">Create User</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Admin Edit User Modal -->
+<div class="modal-overlay" id="editUserModal">
+  <div class="modal">
+    <h3>Edit User Account</h3>
+    <form onsubmit="handleAdminEditUser(event)" style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">
+      <input type="hidden" id="editUserId">
+      <div class="input-group" style="text-align: left;">
+        <label for="editUsername">Username</label>
+        <input type="text" id="editUsername" required style="width: 100%;" autocomplete="off">
+      </div>
+      <div class="input-group" style="text-align: left;">
+        <label for="editPassword">New Password (leave blank to keep current)</label>
+        <input type="password" id="editPassword" placeholder="Enter new password" style="width: 100%;" autocomplete="off">
+      </div>
+      <div class="input-group" style="text-align: left;">
+        <label for="editRole">Role</label>
+        <select id="editRole" style="width: 100%; background: var(--bg-elevated); color: var(--fg); border: 1px solid var(--border); padding: 10px; border-radius: 8px;" required>
+          <option value="user">User (Standard)</option>
+          <option value="admin">Admin (Full Access)</option>
+        </select>
+      </div>
+      <div id="editUserError" style="color: var(--danger); font-size: 13px; text-align: left;"></div>
+      <div class="modal-actions" style="margin-top: 10px;">
+        <button class="btn btn-secondary" type="button" onclick="closeEditUserModal()">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Admin Delete User Confirmation Modal -->
+<div class="modal-overlay" id="deleteUserModal">
+  <div class="modal">
+    <h3 style="color: var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i> Delete User Account?</h3>
+    <p style="margin-top: 10px;">Are you sure you want to delete <strong id="deleteUserDisplay">user</strong>?</p>
+    <p style="color: var(--fg-muted); font-size: 13px; margin-top: 5px;">This will permanently erase their account and all associated study session logs. This action cannot be undone.</p>
+    <input type="hidden" id="deleteUserId">
+    <div class="modal-actions" style="margin-top: 20px;">
+      <button class="btn btn-secondary" onclick="closeDeleteUserModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDeleteUser()">
+        <i class="fa-solid fa-trash"></i> Delete Account
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Load application scripts -->
+<script src="app.js"></script>
+</body>
+</html>
