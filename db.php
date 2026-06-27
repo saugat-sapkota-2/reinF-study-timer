@@ -1,8 +1,8 @@
 <?php
-$host = 'localhost';
-$user = 'root';
-$pass = '';
-$dbname = 'study_tracker';
+$host = 'gateway01.ap-southeast-1.prod.alicloud.tidbcloud.com';
+$user = '2AZiFEQTn5C6CaM.root';
+$pass = 'pUnrYf6JLkEfurcu';
+$dbname = 'reinF_study_timer';
 
 try {
     // Initial connection to MySQL server without database selected
