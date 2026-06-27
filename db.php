@@ -1,19 +1,37 @@
 <?php
 $host = 'gateway01.ap-southeast-1.prod.alicloud.tidbcloud.com';
+$port = 4000;
 $user = '2AZiFEQTn5C6CaM.root';
-$pass = 'pUnrYf6JLkEfurcu';
+$pass = 'SH2S2QYHLXOMZfyw';
 $dbname = 'reinF_study_timer';
 
 try {
-    // Initial connection to MySQL server without database selected
-    $pdo = new PDO("mysql:host=$host", $user, $pass);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
-    // Create database if not exists
-    $pdo->exec("CREATE DATABASE IF NOT EXISTS `$dbname` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-    
-    // Select the database
-    $pdo->exec("USE `$dbname`");
+    $options = [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+    ];
+
+    // Determine the SSL CA path
+    $ssl_ca = null;
+    $possible_ca_paths = [
+        __DIR__ . '/isrgrootx1.pem',                 // Local bundled cert
+        '/etc/ssl/certs/ca-certificates.crt',        // Render/Debian/Ubuntu
+        '/etc/pki/tls/certs/ca-bundle.crt',          // CentOS/RedHat
+        '/etc/ssl/ca-bundle.pem',
+    ];
+    foreach ($possible_ca_paths as $path) {
+        if (file_exists($path)) {
+            $ssl_ca = $path;
+            break;
+        }
+    }
+
+    if ($ssl_ca) {
+        $options[PDO::MYSQL_ATTR_SSL_CA] = $ssl_ca;
+    }
+
+    // Connect directly to the database
+    $pdo = new PDO("mysql:host=$host;port=$port;dbname=$dbname;charset=utf8mb4", $user, $pass, $options);
 
     // Create table users if it doesn't exist
     $createUsersTableQuery = "
